@@ -234,7 +234,7 @@ class Py9kw:
 
         # Step 4: Send data and return captchaid
         if self.verbose:
-            printInfo(logger_prefix + 'Priority: %s of 10, Maxtimeout: %d of 3999s' % (prio_str, self.maxtimeout))
+            printInfo(logger_prefix + 'Priority: %s of 10, Maxtimeout: %d' % (prio_str, self.maxtimeout))
             printInfo(logger_prefix + 'Upload %d bytes to 9kw.eu...' % len(imagedata))
         json_plain = urllib.request.urlopen('%s?%s' % (API_BASE, urlencode(getdata))).read().decode('utf-8', 'ignore')
         if self.verbose:
@@ -248,7 +248,7 @@ class Py9kw:
         if self.verbose:
             printInfo(logger_prefix + '[DONE]')
         if self.verbose:
-            printInfo(logger_prefix + 'Uploaded => Captcha-id: %d' % self.captchaid)
+            printInfo(logger_prefix + 'Uploaded => captchaid: %d' % self.captchaid)
         return self.captchaid, self.errorint, self.errormsg
 
     def sleepAndGetResult(self, custom_timeout=None):
@@ -342,7 +342,7 @@ class Py9kw:
             # Answer is given
             if self.verbose:
                 printInfo(logger_prefix + '[SUCCESS]')
-                printInfo(logger_prefix + 'Captcha solved! String: \'%s\'' % answer)
+                printInfo(logger_prefix + 'Captcha solved! captchaid %d --> Answer: \'%s\'' % (self.captchaid, answer))
         return answer, response, self.errorint, self.errormsg
 
     def captcha_correct(self, iscorrect):
