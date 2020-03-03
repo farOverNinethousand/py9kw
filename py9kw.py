@@ -221,7 +221,7 @@ class Py9kw:
         }
         if self.prio > 0:
             prio_str = str(self.prio)
-            getdata['prio'] = prio
+            getdata['prio'] = self.prio
             if self.verbose:
                 printInfo(logger_prefix + 'Uploading captcha with prio %d' % self.prio)
         else:
@@ -234,7 +234,7 @@ class Py9kw:
 
         # Step 4: Send data and return captchaid
         if self.verbose:
-            printInfo(logger_prefix + 'Priority: %s of 10, Maxtimeout: %d' % (prio_str, self.maxtimeout))
+            printInfo(logger_prefix + 'Priority: %s of %d, Maxtimeout: %d' % (prio_str, PARAM_MAX_PRIO, self.maxtimeout))
             printInfo(logger_prefix + 'Upload %d bytes to 9kw.eu...' % len(imagedata))
         json_plain = urllib.request.urlopen('%s?%s' % (API_BASE, urlencode(getdata))).read().decode('utf-8', 'ignore')
         if self.verbose:
