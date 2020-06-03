@@ -85,7 +85,6 @@ All text based captchas. The 9kw service can handle many more captcha types but 
 * Nicer loggers/output
 * Support for other captcha types
 * Make start params nicer
-* Add start params for 'Playground.py' test class --> Important because if I don't, I will forget my apikey in there at some point :D
 * Update 'Playground.py' to never waste any credits (debug, selfsolve)
 
 Original version's usage instructions:
