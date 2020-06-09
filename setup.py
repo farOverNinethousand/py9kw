@@ -4,7 +4,7 @@
 from distutils.core import setup
 
 setup(name='python3-py9kw',
-      version='2.1.6',
+      version='2.1.7',
       description='Captcha Solving Service library for 9kw.eu API',
       author1='Jan Helbling',
       author1_email='jan.helbling@mailbox.org',

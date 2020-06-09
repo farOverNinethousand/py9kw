@@ -161,6 +161,9 @@ class Py9kw:
         else:
             return self.maxtimeout
 
+    def getCaptchaID(self) -> int:
+        return self.captchaid
+
     def getCaptchaImageFromWebsite(self, image_url, image_path=None):
         """ Returns (captcha) image file obtained from website. And optionally saves it to <image_path>. """
         imagefile = None
@@ -379,7 +382,7 @@ class Py9kw:
         logger_prefix = '[sendCaptchaFeedback] '
         if self.verbose:
             printInfo(logger_prefix + 'Sending captcha feedback : %d' % feedback_status)
-        if self.captchaid is None or self.captchaid == -1:
+        if self.captchaid is None or self.captchaid <= 0:
             # This should only happen on wrong usage
             printInfo(logger_prefix + 'Cannot send captcha feedback because captchaid is not given')
             return self.errorint, self.errormsg
