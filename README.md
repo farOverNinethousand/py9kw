@@ -7,7 +7,7 @@ import urllib
 
 from py9kw import Py9kw
 
-captchaSolver = Py9kw('<APIKEY>', False, True)
+captchaSolver = Py9kw('<APIKEY>')
 captchaSolver.setTimeout(62)
 # Define exactly what we expect as a result according to: https://www.9kw.eu/api.html#apisubmit-tab
 captchaSolver.setAdditionalCaptchaUploadParams({'numeric': '1', 'min_len': '7', 'max_len': '7'})

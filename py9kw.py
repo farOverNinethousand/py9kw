@@ -50,11 +50,11 @@ PARAM_MIN_CREDITS_TO_SOLVE_ONE_CAPTCHA = 10
 
 class Py9kw:
 
-    def __init__(self, apikey, env_proxy=False, verbose=False):
-        """Initialize py9kw with a APIKEY and Optional verbose mode.
+    def __init__(self, apikey, env_proxy=False):
+        """Initialize py9kw with APIKEY
         Verbose mode will print each step to stdout."""
         logger_prefix = '[init] '
-        self.verbose = verbose
+        self.verbose = False
         self.prio = PARAM_DEFAULT_PRIO
         self.maxtimeout = PARAM_MIN_MAXTIMEOUT
         self.apikey = apikey
@@ -89,6 +89,9 @@ class Py9kw:
         self.captchaid = -1
         return
 
+    def setVerbose(self, verbose):
+        self.verbose = verbose
+
     # Checks for errors in json response and returns error_code(int) and error_message(String) separated as API returns them both in one String.
     def checkError(self, response):
         error_plain = response.get('error', None)
@@ -117,7 +120,7 @@ class Py9kw:
         return self.errorint, self.errormsg
 
     def getCaptchaCost(self) -> int:
-        """Returns how much credits it would cost to solve one captcha with the current settings."""
+        """Returns how much credits it would cost to solve one captcha with current settings."""
         captcha_cost = PARAM_MIN_CREDITS_TO_SOLVE_ONE_CAPTCHA
         if self.getPrio() > 0:
             captcha_cost += self.getPrio()
@@ -227,8 +230,8 @@ class Py9kw:
             'maxtimeout': str(self.getTimeout()),
             'source': API_SOURCE,
             'json': '1'
-            #			'selfsolve' : '1',	# For debugging, it's faster.
-            #			'nomd5' : '1'		# always send a new imageid
+            # 'selfsolve' : '1',	# For debugging, it's faster.
+            # 'nomd5' : '1'		# always send a new imageid
         }
         currentPrio = self.getPrio()
         if currentPrio > 0:
@@ -438,11 +441,15 @@ if __name__ == '__main__':
         printInfo('Usage:' + argv[0] + '<APIKEY> <TIME TO SOLVE>')
         exit(0)
 
-# Define exactly what we expect as a result according to: https://www.9kw.eu/api.html#apisubmit-tab
+    # Define exactly what we expect as a result according to: https://www.9kw.eu/api.html#apisubmit-tab
     enableVerbose = False
     selfsolve = True
     additionalParams = {'numeric': '1', 'min_len': '7', 'max_len': '7'}
-    captchaSolver = Py9kw(argv[1], True, enableVerbose)
+    if selfsolve:
+        additionalParams['selfsolve'] = 1
+        additionalParams['nomd5'] = 1
+    captchaSolver = Py9kw(argv[1], True)
+    captchaSolver.setVerbose(enableVerbose)
     captchaSolver.setAdditionalCaptchaUploadParams(additionalParams)
     captchaSolver.setWaitSecondsPerLoop(3)
     captchaSolver.setTimeout(67)
