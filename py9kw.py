@@ -443,11 +443,11 @@ if __name__ == '__main__':
 
     # Define exactly what we expect as a result according to: https://www.9kw.eu/api.html#apisubmit-tab
     enableVerbose = False
-    selfsolve = True
+    selfsolve = False
     additionalParams = {'numeric': '1', 'min_len': '7', 'max_len': '7'}
     if selfsolve:
         additionalParams['selfsolve'] = 1
-        additionalParams['nomd5'] = 1
+        # additionalParams['nomd5'] = 1
     captchaSolver = Py9kw(argv[1], True)
     captchaSolver.setVerbose(enableVerbose)
     captchaSolver.setAdditionalCaptchaUploadParams(additionalParams)
