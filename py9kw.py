@@ -273,7 +273,7 @@ class Py9kw:
         logger_prefix = '[sleepAndGetResult] '
         waitSecondsPerLoop = self.getWaitSecondsPerLoop()
         if self.verbose:
-            printInfo(logger_prefix + 'Waiting until the Captcha is solved or maxtimeout %d (includes %d extra seconds) has expired ...' % (total_timeout, waitSecondsPerLoop))
+            printInfo(logger_prefix + 'Waiting until the Captcha is solved or maxtimeout %d (includes %d extra seconds) has expired ...' % (self.getTimeout(), waitSecondsPerLoop))
         total_time_waited = 0
         waitSecondsLeft = self.getTimeout()
         lastOutputSecondsAgo = seconds_output_frequency
