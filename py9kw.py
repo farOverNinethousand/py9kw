@@ -268,20 +268,19 @@ class Py9kw:
             printInfo(logger_prefix + 'Uploaded => captchaid: %d' % self.captchaid)
         return self.captchaid, self.errorint, self.errormsg
 
-    def sleepAndGetResult(self, custom_timeout=None):
+    def sleepAndGetResult(self, seconds_output_frequency=3):
         """Wait until the Captcha is solved and return result."""
         logger_prefix = '[sleepAndGetResult] '
         waitSecondsPerLoop = self.getWaitSecondsPerLoop()
-        if custom_timeout is not None and custom_timeout >= PARAM_MIN_MAXTIMEOUT:
-            total_timeout = custom_timeout
-        else:
-            total_timeout = self.getTimeout()
         if self.verbose:
             printInfo(logger_prefix + 'Waiting until the Captcha is solved or maxtimeout %d (includes %d extra seconds) has expired ...' % (total_timeout, waitSecondsPerLoop))
         total_time_waited = 0
-        waitSecondsLeft = total_timeout
+        waitSecondsLeft = self.getTimeout()
+        lastOutputSecondsAgo = seconds_output_frequency
         while waitSecondsLeft > 0:
-            printInfo(logger_prefix + 'Waiting for result | Seconds left: %d / %d' % (waitSecondsLeft, total_timeout))
+            if lastOutputSecondsAgo >= seconds_output_frequency:
+                printInfo(logger_prefix + 'Waiting for result | Seconds left: %d / %d' % (waitSecondsLeft, self.getTimeout()))
+                lastOutputSecondsAgo = 0
             result, response, erri, errm = self.getresult()
             server_says_try_again = response.get('try_again', False)
             if result is not None:
@@ -296,14 +295,15 @@ class Py9kw:
                 printInfo(logger_prefix + 'Server does not want us to try again --> Stopping')
                 break
             if waitSecondsLeft >= waitSecondsPerLoop:
-                thisSecondsWaited = waitSecondsPerLoop
+                thisSecondsWait = waitSecondsPerLoop
             else:
-                thisSecondsWaited = waitSecondsLeft
+                thisSecondsWait = waitSecondsLeft
             if self.verbose:
-                printInfo(logger_prefix + 'Waiting %d seconds' % thisSecondsWaited)
-            time.sleep(thisSecondsWaited)
-            total_time_waited += thisSecondsWaited
-            waitSecondsLeft -= thisSecondsWaited
+                printInfo(logger_prefix + 'Waiting %d seconds' % thisSecondsWait)
+            time.sleep(thisSecondsWait)
+            total_time_waited += thisSecondsWait
+            waitSecondsLeft -= thisSecondsWait
+            lastOutputSecondsAgo += thisSecondsWait
         printInfo(logger_prefix + 'Time expired! Failed to find result!')
         self.errorint = 601
         self.errormsg = 'ERROR_INTERNAL_TIMEOUT'
