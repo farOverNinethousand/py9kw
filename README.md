@@ -86,6 +86,9 @@ All text based captchas. The 9kw service can handle many more captcha types but 
 * Support for other captcha types
 * Make start params nicer
 * Update 'Playground.py' to never waste any credits (debug, selfsolve)
+* Remove multiple return parameters, maybe add Exception-handling
+* Debug-output old- and new credits value on update after running getresult()
+* Test selfsolve parameter - why doesn't that work?
 
 Original version's usage instructions:
 ```
