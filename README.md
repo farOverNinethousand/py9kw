@@ -3,7 +3,6 @@
 ### Sample code
 ```python
 import sys
-import urllib
 
 from py9kw import Py9kw
 
@@ -12,7 +11,7 @@ captchaSolver.setTimeout(62)
 # Define exactly what we expect as a result according to: https://www.9kw.eu/api.html#apisubmit-tab
 captchaSolver.setAdditionalCaptchaUploadParams({'numeric': '1', 'min_len': '7', 'max_len': '7'})
 
-creds, errorint, errormsg = captchaSolver.getcredits()
+creds = captchaSolver.getcredits()
 print('Credits left: %d' % creds)
 
 test_url = 'https://confluence.atlassian.com/download/attachments/216957808/captcha.png?version=1&modificationDate=1272411042125&api=v2'
@@ -24,8 +23,8 @@ captchaSolver.uploadcaptcha(test_url, captcha_path)
 abortCaptcha = False
 if abortCaptcha:
     print('Trying to abort already uploaded captcha --> No credits should be used')
-    erri, errm = captchaSolver.captcha_correct_abort()
-    if erri == -1:
+    captchaAborted = captchaSolver.abortCaptcha()
+    if captchaAborted:
         print('Successfully aborted captcha')
     else:
         # This should never happen
@@ -34,21 +33,21 @@ if abortCaptcha:
     sys.exit(0)
 
 print('Getting result ...')
-result, erri, errm = captchaSolver.sleepAndGetResult()
+result = captchaSolver.sleepAndGetResult()
 result_is_correct = False
 if result is not None:
     print('Result = \'%s\' | Expected result = %s' % (result, captcha_expected_result))
     if result == captcha_expected_result:
         result_is_correct = True
         print('Result is correct :)')
-        captchaSolver.captcha_correct(True)
+        captchaSolver.setCaptchaCorrect(True)
     else:
         print('Result is wrong :(')
-        captchaSolver.captcha_correct(False)
+        captchaSolver.setCaptchaCorrect(False)
 else:
     print('No result :(')
 
-creds_after, erri, errm = captchaSolver.getcredits()
+creds_after = captchaSolver.getcredits()
 creds_used = creds - creds_after
 print('Credits used for this test: %d' % creds_used)
 if creds_used > 0 and result is not None and not result_is_correct:
@@ -86,7 +85,7 @@ All text based captchas. The 9kw service can handle many more captcha types but 
 * Support for other captcha types
 * Make start params nicer
 * Update 'Playground.py' to never waste any credits (debug, selfsolve)
-* Remove multiple return parameters, maybe add Exception-handling
+* Add Exceptions
 * Debug-output old- and new credits value on update after running getresult()
 * Test selfsolve parameter - why doesn't that work?
 
