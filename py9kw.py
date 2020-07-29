@@ -71,6 +71,7 @@ class Py9kw:
         self.extrauploaddata = {}
         # Custom errors also possible besides known API errorcodes e.g. 600 --> "ERROR_NO_USER" --> See README.md
         self.errorcode = -1
+        self.sleepOutputFrequencySeconds = 3
         self.errormsg = None
         self.response = {}
         if env_proxy:
@@ -167,6 +168,10 @@ class Py9kw:
 
     def setTimeout(self, maxtimeout):
         self.maxtimeout = maxtimeout
+
+    def setSleepOutputFrequency(self, outputSeconds):
+        """ Defines output frequency for all loops containing sleep statements. Higher = Less output / less "comsole-spam". """
+        self.sleepOutputFrequencySeconds = outputSeconds
 
     def getTimeout(self) -> int:
         if self.maxtimeout < PARAM_MIN_MAXTIMEOUT:
@@ -281,7 +286,7 @@ class Py9kw:
             printInfo(logger_prefix + 'Uploaded => captchaid: %d' % self.captchaid)
         return self.captchaid
 
-    def sleepAndGetResult(self, seconds_output_frequency=3) -> str:
+    def sleepAndGetResult(self) -> str:
         """Wait until the Captcha is solved and return result."""
         logger_prefix = '[sleepAndGetResult] '
         waitSecondsPerLoop = self.getWaitSecondsPerLoop()
@@ -291,9 +296,9 @@ class Py9kw:
             print(logger_prefix + 'WARNING: No captchaid given - no way to get a result!')
         total_time_waited = 0
         waitSecondsLeft = self.getTimeout()
-        lastOutputSecondsAgo = seconds_output_frequency
+        lastOutputSecondsAgo = self.sleepOutputFrequencySeconds
         while waitSecondsLeft > 0:
-            if lastOutputSecondsAgo >= seconds_output_frequency:
+            if lastOutputSecondsAgo >= self.sleepOutputFrequencySeconds:
                 printInfo(logger_prefix + 'Waiting for result | Seconds left: %d / %d' % (waitSecondsLeft, self.getTimeout()))
                 lastOutputSecondsAgo = 0
             captchaResult = self.getresult()
@@ -350,9 +355,10 @@ class Py9kw:
             # 2020-02-06: API might sometimes return this as a String although it is supposed to be a number
             if isinstance(thiscredits, str):
                 thiscredits = int(thiscredits)
-            if self.verbose:
+            # Update credits value on change
+            if self.verbose and thiscredits != self.credits:
                 print(logger_prefix + 'Updated credits value from old: %d to new: %d' % (self.credits, thiscredits))
-            self.credits = thiscredits
+                self.credits = thiscredits
         if nodata == 1:
             if self.verbose:
                 printInfo(logger_prefix + 'No answer yet')
@@ -385,15 +391,15 @@ class Py9kw:
         if iscorrect:
             if self.verbose:
                 printInfo(logger_prefix + 'Sending POSITIVE captcha solved feedback ...')
-            return self.sendCaptchaFeedback(CaptchaFeedback.CAPTCHA_CORRECT)
+            return self.sendCaptchaFeedback(CaptchaFeedback.CAPTCHA_CORRECT.value)
         else:
             if self.verbose:
                 printInfo(logger_prefix + 'Sending NEGATIVE captcha solved feedback ...')
-            return self.sendCaptchaFeedback(CaptchaFeedback.CAPTCHA_INCORRECT)
+            return self.sendCaptchaFeedback(CaptchaFeedback.CAPTCHA_INCORRECT.value)
 
     def abortCaptcha(self) -> bool:
         """Send feedback, aborts the already sent captcha. If no answer is available yet, no credits will be used in this case!"""
-        return self.sendCaptchaFeedback(CaptchaFeedback.CAPTCHA_ABORT_CURRENT_CAPTCHA)
+        return self.sendCaptchaFeedback(CaptchaFeedback.CAPTCHA_ABORT_CURRENT_CAPTCHA.value)
 
     def sendCaptchaFeedback(self, captchaFeedbackNumber) -> bool:
         """Send feedback, is the Captcha result correct(=1) or not(=2) or does the user want to abort(=3)?"""
@@ -464,7 +470,6 @@ if __name__ == '__main__':
         exit(0)
 
     # Define exactly what we expect as a result according to: https://www.9kw.eu/api.html#apisubmit-tab
-    enableVerbose = True
     selfsolve = True
     additionalParams = {'numeric': 1, 'min_len': 7, 'max_len': 7}
     if selfsolve:
@@ -472,10 +477,11 @@ if __name__ == '__main__':
         additionalParams['selfonly'] = 1
         # additionalParams['nomd5'] = 1
     captchaSolver = Py9kw(argv[1], True)
-    captchaSolver.setVerbose(enableVerbose)
+    captchaSolver.setVerbose(False)
     captchaSolver.setAdditionalCaptchaUploadParams(additionalParams)
-    captchaSolver.setWaitSecondsPerLoop(3)
-    captchaSolver.setTimeout(67)
+    captchaSolver.setWaitSecondsPerLoop(5)
+    captchaSolver.setTimeout(80)
+    captchaSolver.setSleepOutputFrequency(10)
     # Get a Sample-Captcha
     sample_captcha_url = 'https://confluence.atlassian.com/download/attachments/216957808/captcha.png?version=1&modificationDate=1272411042125&api=v2'
     test_image_data = captchaSolver.getCaptchaImageFromWebsite(sample_captcha_url)
@@ -499,6 +505,18 @@ if __name__ == '__main__':
         else:
             print('[py9kw-test]', e.filename, ':', e.strerror, '.')
         exit(1)
+    # Use this switch to test captcha abort --> Should not waste any credits
+    abortCaptcha = False
+    if abortCaptcha:
+        print('Trying to abort already uploaded captcha --> No credits should be used')
+        captchaAborted = captchaSolver.abortCaptcha()
+        if captchaAborted:
+            print('Successfully aborted captcha')
+        else:
+            # This should never happen
+            print('Failed to abort captcha')
+        captchaSolver.getresult()
+        exit(0)
     # Sleep and get result
     result = captchaSolver.sleepAndGetResult()
     # Evaluate Result
