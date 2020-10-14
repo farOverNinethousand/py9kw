@@ -25,11 +25,11 @@ import json
 import re
 import time
 import urllib.request
-import validators
 from base64 import b64encode, b64decode
 from os import getenv
 from urllib.parse import urlencode
 from enum import Enum
+from pydantic import BaseModel, HttpUrl, ValidationError
 
 
 class CaptchaFeedback(Enum):
@@ -218,7 +218,15 @@ class Py9kw:
             return -1
         # Step 2: Prepare image data we want to upload
         # First check if we have an URL --> Download image first
-        if isinstance(imagedata, str) and validators.url(imagedata):
+
+        class Link(BaseModel):
+            url: HttpUrl
+        try:
+            Link(url=imagedata)
+            urlValid = True
+        except ValidationError:
+            urlValid = False
+        if isinstance(imagedata, str) and urlValid:
             if self.verbose:
                 printInfo(logger_prefix + 'Provided source is an URL: %s' % imagedata)
             imagedata = self.getCaptchaImageFromWebsite(imagedata, store_image_path)
