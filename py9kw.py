@@ -22,11 +22,13 @@
 
 import binascii
 import json
+import logging
 import re
 import time
 import urllib.request
 from base64 import b64encode, b64decode
 from os import getenv
+from typing import Union
 from urllib.parse import urlencode
 from enum import Enum
 from pydantic import BaseModel, HttpUrl, ValidationError
@@ -54,10 +56,12 @@ PARAM_MIN_MAXTIMEOUT = 60
 PARAM_MAX_MAXTIMEOUT = 3999
 PARAM_MIN_CREDITS_TO_SOLVE_ONE_CAPTCHA = 10
 
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
 
 class Py9kw:
 
-    def __init__(self, apikey, env_proxy=False):
+    def __init__(self, apikey: str, env_proxy: bool = False):
         """Initialize py9kw with APIKEY
         Verbose mode will print each step to stdout."""
         logger_prefix = '[init] '
@@ -91,7 +95,7 @@ class Py9kw:
         self.opener.add_headers = [('User-Agent', 'Python-urllib/3.x (py9kw-api)')]
         urllib.request.install_opener(self.opener)
         if self.verbose:
-            printInfo(logger_prefix + 'Current cost for one captcha: %d' % self.getCaptchaCost())
+            logging.info(logger_prefix + 'Current cost for one captcha: ' + str(self.getCaptchaCost()))
 
     def resetSolver(self):
         """ Call this to reset all runtime values if you e.g. want to re-use a previously created solver instance while keeping your settings (prio, maxtimeout and so on).  """
@@ -107,13 +111,12 @@ class Py9kw:
     def getResponse(self):
         return self.response
 
-    # Checks for errors in json response and returns error_code(int) and error_message(String) separated as API returns them both in one String.
-    def checkError(self, response):
+    def checkError(self, response: dict):
+        """ Checks for errors in json response and returns error_code(int) and error_message(String) separated as API returns them both in one String. """
         error_plain = response.get('error', None)
         if error_plain is not None:
             # Error found
-            if self.verbose:
-                printInfo('[checkError] Found error: Plain error: %s' % error_plain)
+            logging.info('[checkError] Found error: Plain error: ' + error_plain)
             try:
                 error_MatchObject = re.compile(r'^(\d{4}) (.+)').search(error_plain)
                 self.errorcode = int(error_MatchObject.group(1))
@@ -141,7 +144,7 @@ class Py9kw:
             captcha_cost += self.getPrio()
         return captcha_cost
 
-    def setPriority(self, prio):
+    def setPriority(self, prio: int):
         self.prio = prio
 
     def getPrio(self) -> int:
@@ -151,7 +154,11 @@ class Py9kw:
         else:
             return self.prio
 
-    def setWaitSecondsPerLoop(self, waitSeconds):
+    def canSolveOneMoreCaptcha(self) -> bool:
+        """ Returns True if there are enough credits available to solve one more captcha. Depending on the currently set priority.  """
+        return self.getcredits() >= self.getCaptchaCost()
+
+    def setWaitSecondsPerLoop(self, waitSeconds: int):
         self.waitSecondsPerLoop = waitSeconds
         return
 
@@ -162,14 +169,14 @@ class Py9kw:
             # Fallback
             return 10
 
-    def setAdditionalCaptchaUploadParams(self, uploaddata):
+    def setAdditionalCaptchaUploadParams(self, uploaddata: dict):
         """ Use this to add extra captcha upload parameters such as: 'case-sensitive':'1'. Be sure to always use Strings! """
         self.extrauploaddata = uploaddata
 
-    def setTimeout(self, maxtimeout):
+    def setTimeout(self, maxtimeout: int):
         self.maxtimeout = maxtimeout
 
-    def setSleepOutputFrequency(self, outputSeconds):
+    def setSleepOutputFrequency(self, outputSeconds: int):
         """ Defines output frequency for all loops containing sleep statements. Higher = Less output / less "comsole-spam". """
         self.sleepOutputFrequencySeconds = outputSeconds
 
@@ -184,7 +191,7 @@ class Py9kw:
     def getCaptchaID(self) -> int:
         return self.captchaid
 
-    def getCaptchaImageFromWebsite(self, image_url, image_path=None):
+    def getCaptchaImageFromWebsite(self, image_url: str, image_path: str = None):
         """ Returns (captcha) image file obtained from website. And optionally saves it to <image_path>. """
         imagefile = None
         try:
@@ -198,7 +205,7 @@ class Py9kw:
             if self.verbose:
                 printInfo('[getCaptchaImageFromWebsite] [OK]')
         except IOError:
-            printInfo('[getCaptchaImageFromWebsite] [FAIL]')
+            logging.info('[getCaptchaImageFromWebsite] [FAIL]')
             self.errorcode = 603
             self.errormsg = 'CAPTCHA_DOWNLOAD_FAILURE'
         return imagefile
@@ -216,11 +223,12 @@ class Py9kw:
         if self.credits < self.getCaptchaCost():
             printInfo(logger_prefix + 'Not enough credits to solve a captcha')
             return -1
+
         # Step 2: Prepare image data we want to upload
         # First check if we have an URL --> Download image first
-
         class Link(BaseModel):
             url: HttpUrl
+
         try:
             Link(url=imagedata)
             urlValid = True
@@ -279,7 +287,7 @@ class Py9kw:
         if self.verbose:
             printInfo(logger_prefix + 'Priority: %s of %d, Maxtimeout: %d' % (prio_str, PARAM_MAX_PRIO, self.maxtimeout))
             printInfo(logger_prefix + 'Upload %d bytes to 9kw.eu...' % len(imagedata))
-        json_plain = urllib.request.urlopen('%s?%s' % (API_BASE, urlencode(getdata))).read().decode('utf-8', 'ignore')
+        json_plain = urllib.request.urlopen(API_BASE + '?' + urlencode(getdata)).read().decode('utf-8', 'ignore')
         if self.verbose:
             printInfo(logger_prefix + 'json debug: ' + json_plain)
         response = json.loads(json_plain)
@@ -294,7 +302,7 @@ class Py9kw:
             printInfo(logger_prefix + 'Uploaded => captchaid: %d' % self.captchaid)
         return self.captchaid
 
-    def sleepAndGetResult(self) -> str:
+    def sleepAndGetResult(self) -> Union[str, None]:
         """Wait until the Captcha is solved and return result."""
         logger_prefix = '[sleepAndGetResult] '
         waitSecondsPerLoop = self.getWaitSecondsPerLoop()
@@ -337,7 +345,7 @@ class Py9kw:
         self.errormsg = 'ERROR_INTERNAL_TIMEOUT'
         return None
 
-    def getresult(self) -> str:  # https://stackoverflow.com/questions/42127461/pycharm-function-doesnt-return-anything
+    def getresult(self) -> Union[str, None]:  # https://stackoverflow.com/questions/42127461/pycharm-function-doesnt-return-anything
         """Get result from 9kw.eu. Use sleepAndGetResult for auto-wait handling! """
         logger_prefix = '[getresult] '
         getdata = {
@@ -393,7 +401,7 @@ class Py9kw:
                 printInfo(logger_prefix + 'Captcha solved! captchaid %d --> Answer: \'%s\'' % (self.captchaid, answer))
         return answer
 
-    def setCaptchaCorrect(self, iscorrect) -> bool:
+    def setCaptchaCorrect(self, iscorrect: bool) -> bool:
         """Send feedback, is the Captcha result correct or not?"""
         logger_prefix = '[captcha_correct] '
         if iscorrect:
@@ -428,7 +436,7 @@ class Py9kw:
         }
         try:
             response = json.loads(
-                urllib.request.urlopen('%s?%s' % (API_BASE, urlencode(getdata))).read().decode('utf-8', 'ignore'))
+                urllib.request.urlopen(API_BASE + '?' + urlencode(getdata)).read().decode('utf-8', 'ignore'))
             # Check for errors but do not handle them. If something does wrong here it is not so important!
             self.checkError(response)
         except:
@@ -449,7 +457,7 @@ class Py9kw:
         }
 
         response = json.loads(
-            urllib.request.urlopen('%s?%s' % (API_BASE, urlencode(getdata))).read().decode('utf-8', 'ignore'))
+            urllib.request.urlopen(API_BASE + '?' + urlencode(getdata)).read().decode('utf-8', 'ignore'))
         self.checkError(response)
         if self.errorcode > -1:
             printInfo(logger_info + 'Error: %s' % self.errormsg)
@@ -462,7 +470,7 @@ class Py9kw:
         self.credits = usercredits
         return self.credits
 
-    def setErrorCode(self, errorcode):
+    def setErrorCode(self, errorcode: int):
         self.errorcode = errorcode
 
     def getErrorCode(self) -> int:
@@ -490,6 +498,7 @@ if __name__ == '__main__':
     captchaSolver.setWaitSecondsPerLoop(5)
     captchaSolver.setTimeout(80)
     captchaSolver.setSleepOutputFrequency(10)
+    captchaSolver.setPriority(20)
     # Get a Sample-Captcha
     sample_captcha_url = 'https://confluence.atlassian.com/download/attachments/216957808/captcha.png?version=1&modificationDate=1272411042125&api=v2'
     test_image_data = captchaSolver.getCaptchaImageFromWebsite(sample_captcha_url)
@@ -503,7 +512,7 @@ if __name__ == '__main__':
         exit(0)
     print('[py9kw-test] Credits: {}'.format(creditsBefore))
 
-    # Upload it
+    # Upload picture
     try:
         test_captchaid = captchaSolver.uploadcaptcha(test_image_data, True, int(argv[2]), 10)
     except IOError as e:

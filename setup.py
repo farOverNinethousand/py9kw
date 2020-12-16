@@ -4,7 +4,7 @@
 from distutils.core import setup
 
 setup(name='python3-py9kw',
-      version='2.2.3',
+      version='2.2.4',
       description='Captcha Solving Service library for 9kw.eu API',
       author1='Jan Helbling',
       author1_email='jan.helbling@mailbox.org',
@@ -13,5 +13,5 @@ setup(name='python3-py9kw',
       author2_email=None,
       author2_url='https://github.com/farOverNinethousand',
       url='https://github.com/JanHelbling/py9kw',
-      py_modules=['py9kw'], requires=['validators']
+      py_modules=['py9kw']
       )
