@@ -56,7 +56,9 @@ PARAM_MIN_MAXTIMEOUT = 60
 PARAM_MAX_MAXTIMEOUT = 3999
 PARAM_MIN_CREDITS_TO_SOLVE_ONE_CAPTCHA = 10
 
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.WARNING)
 
 
 class Py9kw:
@@ -121,8 +123,7 @@ class Py9kw:
                 error_MatchObject = re.compile(r'^(\d{4}) (.+)').search(error_plain)
                 self.errorcode = int(error_MatchObject.group(1))
                 self.errormsg = error_MatchObject.group(2)
-                if self.verbose:
-                    printInfo('[checkError] Found error: Number: %d | Message: %s' % (self.errorcode, self.errormsg))
+                logging.info('[checkError] Detected error-response: Number: %d | Message: %s' % (self.errorcode, self.errormsg))
             except:
                 # This should never happen
                 self.errormsg = 'Error while parsing error number and message'
@@ -130,15 +131,13 @@ class Py9kw:
                 printInfo(self.errormsg)
         else:
             # No error found
-            if self.verbose:
-                printInfo('[checkError] OK - NO ERROR')
             # Reset error state
             self.errorcode = -1
             self.errormsg = None
         return self.errorcode, self.errormsg
 
     def getCaptchaCost(self) -> int:
-        """Returns how much credits it would cost to solve one captcha with current settings."""
+        """Returns how much credits it would cost to solve one captcha with current priority setting."""
         captcha_cost = PARAM_MIN_CREDITS_TO_SOLVE_ONE_CAPTCHA
         if self.getPrio() > 0:
             captcha_cost += self.getPrio()
@@ -210,18 +209,19 @@ class Py9kw:
             self.errormsg = 'CAPTCHA_DOWNLOAD_FAILURE'
         return imagefile
 
-    def uploadcaptcha(self, imagedata, store_image_path=None, maxtimeout=None, prio=None) -> int:
+    # TODO: Fix maxtimeout & prio default values, consider removing these params here
+    def uploadcaptcha(self, imagedata: str, store_image_path=None, maxtimeout: int = None, prio: int = -1) -> int:
         """Upload the Captcha to 9kw.eu (gif/jpg/png)."""
         logger_prefix = '[uploadcaptcha] '
         # Step 1: Set optional parameters and check if user has enough credits
         if self.verbose:
-            printInfo(logger_prefix + 'Attempting to upload captcha...')
+            logging.info(logger_prefix + 'Attempting to upload captcha...')
         if maxtimeout is not None:
             self.setTimeout(maxtimeout)
         if prio is not None:
             self.setPriority(prio)
         if self.credits < self.getCaptchaCost():
-            printInfo(logger_prefix + 'Not enough credits to solve a captcha')
+            logging.info(logger_prefix + 'Not enough credits to solve a captcha')
             return -1
 
         # Step 2: Prepare image data we want to upload
@@ -235,23 +235,16 @@ class Py9kw:
         except ValidationError:
             urlValid = False
         if isinstance(imagedata, str) and urlValid:
-            if self.verbose:
-                printInfo(logger_prefix + 'Provided source is an URL: %s' % imagedata)
+            logging.info(logger_prefix + 'Provided source is an URL: %s' % imagedata)
             imagedata = self.getCaptchaImageFromWebsite(imagedata, store_image_path)
             if self.errorcode > -1:
                 # Error during picture download
-                print(logger_prefix + 'Error during picture download')
+                logging.warning(logger_prefix + 'Error during picture download')
                 return self.captchaid
         try:
-            if self.verbose:
-                printInfo(logger_prefix + 'Check if the imagedata is already base64 encoded...')
             if b64encode(b64decode(imagedata)) == imagedata:
-                if self.verbose:
-                    printInfo(logger_prefix + 'YES, already encoded')
                 imagedata = imagedata
             else:
-                if self.verbose:
-                    printInfo(logger_prefix + 'NO, encoding it now')
                 imagedata = b64encode(imagedata)
         except binascii.Error:
             imagedata = b64encode(imagedata)
@@ -269,78 +262,68 @@ class Py9kw:
         }
         currentPrio = self.getPrio()
         if currentPrio > 0:
-            prio_str = str(currentPrio)
+            prioStr = str(currentPrio)
             getdata['prio'] = currentPrio
-            if self.verbose:
-                printInfo(logger_prefix + 'Uploading captcha with prio %d' % currentPrio)
         else:
-            prio_str = 'None'
-            if self.verbose:
-                printInfo(logger_prefix + 'Uploading captcha without prio')
+            prioStr = 'None'
         if self.extrauploaddata is not None and len(self.extrauploaddata) > 0:
             getdata.update(self.extrauploaddata)
-            if self.verbose:
-                printInfo(logger_prefix + 'extra params:')
-                printInfo(logger_prefix + json.dumps(self.extrauploaddata, indent=4))
+            logging.info(logger_prefix + 'extra params:')
+            logging.info(logger_prefix + json.dumps(self.extrauploaddata, indent=4))
 
         # Step 4: Send data and return captchaid
-        if self.verbose:
-            printInfo(logger_prefix + 'Priority: %s of %d, Maxtimeout: %d' % (prio_str, PARAM_MAX_PRIO, self.maxtimeout))
-            printInfo(logger_prefix + 'Upload %d bytes to 9kw.eu...' % len(imagedata))
+        logging.info(logger_prefix + 'Priority: %s of %d, Maxtimeout: %d' % (prioStr, PARAM_MAX_PRIO, self.maxtimeout))
+        logging.info(logger_prefix + 'Upload %d bytes to 9kw.eu...' % len(imagedata))
         json_plain = urllib.request.urlopen(API_BASE + '?' + urlencode(getdata)).read().decode('utf-8', 'ignore')
         if self.verbose:
-            printInfo(logger_prefix + 'json debug: ' + json_plain)
+            logging.debug(logger_prefix + 'json debug: ' + json_plain)
         response = json.loads(json_plain)
         self.checkError(response)
         self.captchaid = int(response.get('captchaid', -1))
         if self.errorcode > -1 or self.captchaid == -1:
-            printInfo(logger_prefix + 'Error ...')
+            logging.warning(logger_prefix + 'Error happened and/or did not get captchaid')
             return -1
-        if self.verbose:
-            printInfo(logger_prefix + '[DONE]')
-        if self.verbose:
-            printInfo(logger_prefix + 'Uploaded => captchaid: %d' % self.captchaid)
+        logging.info(logger_prefix + '[DONE] Uploaded => captchaid: %d' % self.captchaid)
         return self.captchaid
 
     def sleepAndGetResult(self) -> Union[str, None]:
         """Wait until the Captcha is solved and return result."""
         logger_prefix = '[sleepAndGetResult] '
         waitSecondsPerLoop = self.getWaitSecondsPerLoop()
-        if self.verbose:
-            printInfo(logger_prefix + 'Waiting until the Captcha is solved or maxtimeout %d (includes %d extra seconds) has expired ...' % (self.getTimeout(), waitSecondsPerLoop))
+        logging.info(logger_prefix + 'Waiting until the Captcha is solved or maxtimeout %d (includes %d extra seconds) has expired ...' % (self.getTimeout(), waitSecondsPerLoop))
         if self.captchaid == -1:
-            print(logger_prefix + 'WARNING: No captchaid given - no way to get a result!')
+            logging.warning(logger_prefix + 'WARNING: No captchaid given - no way to get a result!')
+            return None
         total_time_waited = 0
         waitSecondsLeft = self.getTimeout()
         lastOutputSecondsAgo = self.sleepOutputFrequencySeconds
         while waitSecondsLeft > 0:
             if lastOutputSecondsAgo >= self.sleepOutputFrequencySeconds:
-                printInfo(logger_prefix + 'Waiting for result | Seconds left: %d / %d' % (waitSecondsLeft, self.getTimeout()))
+                logging.info(logger_prefix + 'Waiting for result | Seconds left: %d / %d' % (waitSecondsLeft, self.getTimeout()))
                 lastOutputSecondsAgo = 0
             captchaResult = self.getresult()
-            server_says_try_again = self.getResponse().get('try_again', False)
+            tryAgainStatus = self.getResponse().get('try_again', False)
             if captchaResult is not None:
                 # We've reached our goal :)
-                printInfo(logger_prefix + 'Total seconds waited for result: %d' % total_time_waited)
+                logging.info(logger_prefix + 'Done!Total seconds waited for result: %d' % total_time_waited)
                 return captchaResult
             if self.errorcode > -1 and self.errorcode != 602:
                 # Retry only on 602 NO_ANSWER_YET - step out of loop if any other error happens
-                printInfo(logger_prefix + 'Error happened --> Giving up')
+                logging.info(logger_prefix + 'Error happened: ' + str(self.errorcode) + ' --> Giving up')
                 break
-            elif server_says_try_again == 0:
-                printInfo(logger_prefix + 'Server does not want us to try again --> Stopping')
+            elif tryAgainStatus == 0:
+                logging.info(logger_prefix + 'Server does not want us to try again --> Stopping')
                 break
             if waitSecondsLeft >= waitSecondsPerLoop:
                 thisSecondsWait = waitSecondsPerLoop
             else:
                 thisSecondsWait = waitSecondsLeft
-            if self.verbose:
-                printInfo(logger_prefix + 'Waiting %d seconds' % thisSecondsWait)
+            logging.info(logger_prefix + 'Waiting %d seconds' % thisSecondsWait)
             time.sleep(thisSecondsWait)
             total_time_waited += thisSecondsWait
             waitSecondsLeft -= thisSecondsWait
             lastOutputSecondsAgo += thisSecondsWait
-        printInfo(logger_prefix + 'Time expired! Failed to find result!')
+        logging.info(logger_prefix + 'Time expired! Failed to find result!')
         self.errorcode = 601
         self.errormsg = 'ERROR_INTERNAL_TIMEOUT'
         return None
@@ -373,11 +356,10 @@ class Py9kw:
                 thiscredits = int(thiscredits)
             # Update credits value on change
             if self.verbose and thiscredits != self.credits:
-                print(logger_prefix + 'Updated credits value from old: %d to new: %d' % (self.credits, thiscredits))
+                logging.info(logger_prefix + 'Updated credits value from old: %d to new: %d' % (self.credits, thiscredits))
                 self.credits = thiscredits
         if nodata == 1:
-            if self.verbose:
-                printInfo(logger_prefix + 'No answer yet')
+            logging.info(logger_prefix + 'No answer yet')
             self.setErrorCode(602)
             self.errormsg = 'NO_ANSWER_YET'
             return None
@@ -385,32 +367,28 @@ class Py9kw:
             # Special: We need to set an error to make sure that our sleep handling would stop!
             self.setErrorCode(600)
             self.errormsg = 'ERROR_NO_USER'
-            printInfo(logger_prefix + 'No users there to solve at this moment --> Or your timeout is too small OR you\'ve aborted this captcha before')
+            logging.info(logger_prefix + 'No users there to solve at this moment --> Or your timeout is too small OR you\'ve aborted this captcha before')
             return None
         elif self.errorcode > -1:
-            printInfo(logger_prefix + 'Error %d: %s' % (self.errorcode, self.errormsg))
+            logging.info(logger_prefix + 'Error %d: %s' % (self.errorcode, self.errormsg))
             return None
         elif answer is None:
             # Answer is not given but also we did not get any errormessage
-            if self.verbose:
-                printInfo(logger_prefix + '[FAILURE] --> Failed to find answer --> Unknown failure')
+            logging.warning(logger_prefix + '[FAILURE] --> Failed to find answer --> Unknown failure')
+            return None
         else:
-            # Answer is given
-            if self.verbose:
-                printInfo(logger_prefix + '[SUCCESS]')
-                printInfo(logger_prefix + 'Captcha solved! captchaid %d --> Answer: \'%s\'' % (self.captchaid, answer))
-        return answer
+            # Captcha-Answer is given
+            logging.info(logger_prefix + '[SUCCESS] Captcha solved! captchaid %d --> Answer: \'%s\'' % (self.captchaid, answer))
+            return answer
 
     def setCaptchaCorrect(self, iscorrect: bool) -> bool:
         """Send feedback, is the Captcha result correct or not?"""
         logger_prefix = '[captcha_correct] '
         if iscorrect:
-            if self.verbose:
-                printInfo(logger_prefix + 'Sending POSITIVE captcha solved feedback ...')
+            logging.info(logger_prefix + 'Sending POSITIVE captcha solved feedback ...')
             return self.sendCaptchaFeedback(CaptchaFeedback.CAPTCHA_CORRECT.value)
         else:
-            if self.verbose:
-                printInfo(logger_prefix + 'Sending NEGATIVE captcha solved feedback ...')
+            logging.info(logger_prefix + 'Sending NEGATIVE captcha solved feedback ...')
             return self.sendCaptchaFeedback(CaptchaFeedback.CAPTCHA_INCORRECT.value)
 
     def abortCaptcha(self) -> bool:
@@ -420,11 +398,10 @@ class Py9kw:
     def sendCaptchaFeedback(self, captchaFeedbackNumber) -> bool:
         """Send feedback, is the Captcha result correct(=1) or not(=2) or does the user want to abort(=3)?"""
         logger_prefix = '[sendCaptchaFeedback] '
-        if self.verbose:
-            printInfo(logger_prefix + 'Sending captcha feedback : %d' % captchaFeedbackNumber)
+        logging.info(logger_prefix + 'Sending captcha feedback : %d' % captchaFeedbackNumber)
         if self.captchaid is None or self.captchaid <= 0:
-            # This should only happen on wrong usage
-            printInfo(logger_prefix + 'Cannot send captcha feedback because captchaid is not given')
+            # This will only happen on wrong usage
+            logging.warning(logger_prefix + 'Cannot send captcha feedback because captchaid is not given')
             return False
         getdata = {
             'action': 'usercaptchacorrectback',
@@ -439,10 +416,10 @@ class Py9kw:
                 urllib.request.urlopen(API_BASE + '?' + urlencode(getdata)).read().decode('utf-8', 'ignore'))
             # Check for errors but do not handle them. If something does wrong here it is not so important!
             self.checkError(response)
+            return True
         except:
-            printInfo(logger_prefix + 'Error in captcha_correct')
+            logging.warning(logger_prefix + 'Error in captcha_correct')
             return False
-        return True
 
     def getcredits(self):
         """Get aviable Credits..."""
@@ -496,9 +473,9 @@ if __name__ == '__main__':
     captchaSolver.setVerbose(False)
     captchaSolver.setAdditionalCaptchaUploadParams(additionalParams)
     captchaSolver.setWaitSecondsPerLoop(5)
-    captchaSolver.setTimeout(80)
+    captchaSolver.setTimeout(120)
     captchaSolver.setSleepOutputFrequency(10)
-    captchaSolver.setPriority(20)
+    # captchaSolver.setPriority(20)
     # Get a Sample-Captcha
     sample_captcha_url = 'https://confluence.atlassian.com/download/attachments/216957808/captcha.png?version=1&modificationDate=1272411042125&api=v2'
     test_image_data = captchaSolver.getCaptchaImageFromWebsite(sample_captcha_url)
