@@ -164,6 +164,7 @@ class Py9kw:
         self.extrauploaddata = uploaddata
 
     def setTimeout(self, maxtimeout: int):
+        """ Defines how many seconds the server will allow users to solve the uploaded captcha before giving up. """
         self.maxtimeout = maxtimeout
 
     def setSleepOutputFrequency(self, outputSeconds: int):
