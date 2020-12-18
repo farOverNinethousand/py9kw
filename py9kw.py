@@ -64,10 +64,8 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 class Py9kw:
 
     def __init__(self, apikey: str, env_proxy: bool = False):
-        """Initialize py9kw with APIKEY
-        Verbose mode will print each step to stdout."""
+        """Initialize py9kw with APIKEY """
         logger_prefix = '[init] '
-        self.verbose = False
         self.prio = PARAM_DEFAULT_PRIO
         self.maxtimeout = PARAM_MIN_MAXTIMEOUT
         self.apikey = apikey
@@ -84,28 +82,21 @@ class Py9kw:
             self.proxy = getenv('http_proxy')
             if self.proxy is None:
                 self.proxyhdl = urllib.request.ProxyHandler({})
-                if self.verbose:
-                    printInfo(logger_prefix + "Warning: You have set env_proxy=True, but http_proxy is not set!")
-                    printInfo(logger_prefix + "I will countine without a Proxy.")
+                logging.warning(logger_prefix + "Warning: You have set env_proxy=True, but http_proxy is not set!")
+                logging.warning(logger_prefix + "I will countine without a Proxy.")
             else:
                 self.proxyhdl = urllib.request.ProxyHandler({'http', self.proxy})
-                if self.verbose:
-                    printInfo(logger_prefix + "Loaded http_proxy => {}".format(self.proxy))
         else:
             self.proxyhdl = urllib.request.ProxyHandler({})
         self.opener = urllib.request.build_opener(self.proxyhdl)
         self.opener.add_headers = [('User-Agent', 'Python-urllib/3.x (py9kw-api)')]
         urllib.request.install_opener(self.opener)
-        if self.verbose:
-            logging.info(logger_prefix + 'Current cost for one captcha: ' + str(self.getCaptchaCost()))
+        logging.info(logger_prefix + 'Current cost for one captcha: ' + str(self.getCaptchaCost()))
 
     def resetSolver(self):
         """ Call this to reset all runtime values if you e.g. want to re-use a previously created solver instance while keeping your settings (prio, maxtimeout and so on).  """
         self.captchaid = -1
         return
-
-    def setVerbose(self, verbose):
-        self.verbose = verbose
 
     def setResponse(self, response):
         self.response = response
@@ -128,7 +119,7 @@ class Py9kw:
                 # This should never happen
                 self.errormsg = 'Error while parsing error number and message'
                 self.errorcode = 666
-                printInfo(self.errormsg)
+                logging.warning(self.errormsg)
         else:
             # No error found
             # Reset error state
@@ -200,9 +191,7 @@ class Py9kw:
                 with open(image_path, 'wb') as file:
                     file.write(imagefile)
                 file.close()
-
-            if self.verbose:
-                printInfo('[getCaptchaImageFromWebsite] [OK]')
+            logging.info('[getCaptchaImageFromWebsite] [OK]')
         except IOError:
             logging.info('[getCaptchaImageFromWebsite] [FAIL]')
             self.errorcode = 603
@@ -214,8 +203,7 @@ class Py9kw:
         """Upload the Captcha to 9kw.eu (gif/jpg/png)."""
         logger_prefix = '[uploadcaptcha] '
         # Step 1: Set optional parameters and check if user has enough credits
-        if self.verbose:
-            logging.info(logger_prefix + 'Attempting to upload captcha...')
+        logging.info(logger_prefix + 'Attempting to upload captcha...')
         if maxtimeout is not None:
             self.setTimeout(maxtimeout)
         if prio is not None:
@@ -275,8 +263,7 @@ class Py9kw:
         logging.info(logger_prefix + 'Priority: %s of %d, Maxtimeout: %d' % (prioStr, PARAM_MAX_PRIO, self.maxtimeout))
         logging.info(logger_prefix + 'Upload %d bytes to 9kw.eu...' % len(imagedata))
         json_plain = urllib.request.urlopen(API_BASE + '?' + urlencode(getdata)).read().decode('utf-8', 'ignore')
-        if self.verbose:
-            logging.debug(logger_prefix + 'json debug: ' + json_plain)
+        logging.debug(logger_prefix + 'json debug: ' + json_plain)
         response = json.loads(json_plain)
         self.checkError(response)
         self.captchaid = int(response.get('captchaid', -1))
@@ -339,11 +326,9 @@ class Py9kw:
             'source': API_SOURCE,
             'json': 1
         }
-        if self.verbose:
-            printInfo(logger_prefix + 'Try to fetch the solved result from 9kw.eu...')
+        printInfo(logger_prefix + 'Try to fetch the solved result from 9kw.eu...')
         plain_json = urllib.request.urlopen('%s?%s' % (API_BASE, urlencode(getdata))).read().decode('utf-8', 'ignore')
-        if self.verbose:
-            printInfo(plain_json)
+        logging.info('Response: ' + plain_json)
         response = json.loads(plain_json)
         self.setResponse(response)
         self.checkError(response)
@@ -355,7 +340,7 @@ class Py9kw:
             if isinstance(thiscredits, str):
                 thiscredits = int(thiscredits)
             # Update credits value on change
-            if self.verbose and thiscredits != self.credits:
+            if thiscredits != self.credits:
                 logging.info(logger_prefix + 'Updated credits value from old: %d to new: %d' % (self.credits, thiscredits))
                 self.credits = thiscredits
         if nodata == 1:
@@ -424,8 +409,7 @@ class Py9kw:
     def getcredits(self):
         """Get aviable Credits..."""
         logger_info = '[getcredits] '
-        if self.verbose:
-            printInfo(logger_info + 'Get available Credits...')
+        logging.info(logger_info + 'Get available Credits...')
         getdata = {
             'action': 'usercaptchaguthaben',
             'apikey': self.apikey,
@@ -437,13 +421,11 @@ class Py9kw:
             urllib.request.urlopen(API_BASE + '?' + urlencode(getdata)).read().decode('utf-8', 'ignore'))
         self.checkError(response)
         if self.errorcode > -1:
-            printInfo(logger_info + 'Error: %s' % self.errormsg)
+            logging.warning(logger_info + 'Failed to obtain credits: %s' % self.errormsg)
             return -1
         usercredits = response.get('credits', -1)
-        if self.verbose:
-            cost_per_captcha = self.getCaptchaCost()
-            printInfo(logger_info + '%d credits available | Cost per captcha (with current prio %d): %d | Enough to solve approximately %d captchas' % (
-                usercredits, self.getPrio(), cost_per_captcha, (usercredits / cost_per_captcha)))
+        printInfo(logger_info + '%d credits available | Cost per captcha (with current prio %d): %d | Enough to solve approximately %d captchas' % (
+                usercredits, self.getPrio(), self.getCaptchaCost(), (usercredits / self.getCaptchaCost())))
         self.credits = usercredits
         return self.credits
 
@@ -470,7 +452,6 @@ if __name__ == '__main__':
         additionalParams['selfonly'] = 1
         # additionalParams['nomd5'] = 1
     captchaSolver = Py9kw(argv[1], True)
-    captchaSolver.setVerbose(False)
     captchaSolver.setAdditionalCaptchaUploadParams(additionalParams)
     captchaSolver.setWaitSecondsPerLoop(5)
     captchaSolver.setTimeout(120)
@@ -542,6 +523,5 @@ if __name__ == '__main__':
         print('Your %d used credits will never come back :(' % creds_used)
     print('Credits left: %d' % creds_after)
     print('END')
-
     printInfo('[py9kw-test] [!END!]')
     exit(0)
